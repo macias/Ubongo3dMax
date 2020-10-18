@@ -35,25 +35,11 @@ namespace Ubongo3dMax
             return data;
         }
 
-
         protected readonly bool[,,] Data;
 
         protected int LengthZ => this.Data.GetLength(0);
         protected int LengthY => this.Data.GetLength(1);
         protected int LengthX => this.Data.GetLength(2);
-
-        public IEnumerable<(int z, int y, int x)> Positions
-        {
-            get
-            {
-                for (int z = 0; z < LengthZ; ++z)
-                    for (int y = 0; y < LengthY; ++y)
-                        for (int x = 0; x < LengthX; ++x)
-                            if (this.Data[z, y, x])
-                                yield return (z, y, x);
-
-            }
-        }
 
         public bool this[int z, int y, int x]
         {

@@ -20,9 +20,9 @@ namespace Ubongo3dMax
             this.labels = labels.OrderBy(s => s).ToArray();
         }
 
-        public void Print(TextWriter writer)
+        public void Print(TextWriter writer, bool solution = false)
         {
-            if (false) // prints solution
+            if (solution)
             {
                 for (int y = 0; y < LengthY; ++y)
                 {
@@ -44,7 +44,11 @@ namespace Ubongo3dMax
                 writer.WriteLine(new string('-', LengthX));
             }
 
-            writer.WriteLine(String.Join(", ", labels.GroupBy(s => s).Select(it => $"{it.Key} {it.Count()}")));
+            writer.WriteLine(string.Join(", ", labels.GroupBy(s => s).Select(it =>
+            {
+                int c = it.Count();
+                return (c == 1 ? "" : $"{c} ") + it.Key;
+            })));
         }
 
         public override bool Equals(object obj)
@@ -67,8 +71,12 @@ namespace Ubongo3dMax
             if (LengthZ != other.LengthZ || LengthY != other.LengthY || LengthX != other.LengthX)
                 return false;
 
-            //return isIdentical(other);
-            return samePieces(other);
+            // switch it if you want to see all ways how given board can be solved with the same pieces
+            const bool all_ways = false;
+            if (all_ways)
+                return isIdentical(other);
+            else
+                return samePieces(other);
         }
 
         private bool isIdentical(Snapshot other)

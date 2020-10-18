@@ -13,7 +13,7 @@ namespace Ubongo3dMax
             return new Board(repository, Parse(Enumerable.Range(0, height).Select(_ => lines).ToArray()));
         }
 
-        private readonly IReadOnlyDictionary<(int z, int y, int x), IEnumerable<Piece>> fitters;
+        private readonly IEnumerable<(int z, int y, int x, IEnumerable<Piece> pieces)> fitters;
         private readonly Piece[,,] configuration;
         private readonly Repository repository;
 
@@ -21,11 +21,11 @@ namespace Ubongo3dMax
         {
             this.Volume = data.Cast<bool>().Count(x => x);
             this.repository = repository;
-            this.fitters = Fit();
+            this.fitters = initialFitting();
             this.configuration = new Piece[LengthZ, LengthY, LengthX];
         }
 
-        private bool CanFitAt(Piece piece, int z, int y, int x)
+        private bool canFitAt(Piece piece, int z, int y, int x)
         {
             foreach ((int pz, int py, int px) in piece.Positions)
                 if (!this[z + pz, y + py, x + px])
@@ -34,59 +34,80 @@ namespace Ubongo3dMax
             return true;
         }
 
-        private Dictionary<(int z, int y, int x), IEnumerable<Piece>> Fit()
-        {
-            var fitters = new Dictionary<(int z, int y, int x), IEnumerable<Piece>>();
-            foreach ((int z, int y, int x) in Positions)
-            {
-                var list = new List<Piece>();
-                foreach (Piece piece in repository.Pieces)
-                    if (CanFitAt(piece, z, y, x))
-                    {
-                        list.Add(piece);
-                    }
 
-                if (list.Any())
-                    fitters.Add((z, y, x), list);
-            }
+        private IEnumerable<(int z, int y, int x, IEnumerable<Piece> pieces)> initialFitting()
+        {
+            var fitters = new List<(int z, int y, int x, IEnumerable<Piece> pieces)>();
+            // we have to extend anchor positions because (0,0,0) of the board is not the same as (0,0,0)
+            // of the piece and besides piece can be rotated such way that its (0,0,0) falls into empty space anyway
+            for (int z = -LengthZ + 1; z < LengthZ * 2 - 1; ++z)
+                for (int y = -LengthY + 1; y < LengthY * 2 - 1; ++y)
+                    for (int x = -LengthX + 1; x < LengthX * 2 - 1; ++x)
+                    {
+                        var list = new List<Piece>();
+                        foreach (Piece piece in repository.Pieces)
+                            if (canFitAt(piece, z, y, x))
+                            {
+                                list.Add(piece);
+                            }
+
+                        if (list.Any())
+                            fitters.Add((z, y, x, list));
+                    }
 
             return fitters;
         }
 
-        private IEnumerable<(Piece piece, int z, int y, int x)> getMoves(int usedZ, int usedY, int usedX)
+        private IEnumerable<(Piece piece, int z, int y, int x)> getMoves(int usedZ, int usedY, int usedX, Piece usedPiece)
         {
-            foreach ((int z, int y, int x) in this.Positions)
+            foreach ((int z, int y, int x, IEnumerable<Piece> pieces) in this.fitters)
             {
-                if (!greaterThan(z, y, x, usedZ, usedY, usedX))
-                    continue;
-                if (!this.fitters.TryGetValue((z, y, x), out IEnumerable<Piece> pieces))
+                // since time/order in ubongo does not matter every following "move" has to hit coordinates
+                // "greater" than previous move used. Otherwise we would check given solutions multiple times
+                // "equal" part is tricky here -- in theory we could put multiple pieces at the same position
+                // because of their current rotation
+                int pos_comparison = compare(z, y, x, usedZ, usedY, usedX);
+                // if current position is not greater or equal to used --> continue
+                if (pos_comparison < 0)
                     continue;
 
                 foreach (Piece p in pieces)
                     if (p.Volume <= this.Volume
+                        // piece index is just the forth coordinate
+                        && (pos_comparison > 0 || p.Index > (usedPiece?.Index ?? -1))
                         && repository.IsAvailable(p)
-                        && CanFitAt(p, z, y, x))
+                        // we have to check if we can fit at this particular time, because some space might be
+                        // taken already by some other piece
+                        && canFitAt(p, z, y, x))
                     {
                         yield return (p, z, y, x);
                     }
             }
         }
 
-        private static bool greaterThan(int z, int y, int x, int usedZ, int usedY, int usedX)
+        private static int compare(int z, int y, int x, int usedZ, int usedY, int usedX)
         {
-            return z > usedZ || (z == usedZ && (y > usedY || (y == usedY && x > usedX)));
+            int result;
+            result = z.CompareTo(usedZ);
+            if (result != 0)
+                return result;
+            result = y.CompareTo(usedY);
+            if (result != 0)
+                return result;
+            result = x.CompareTo(usedX);
+            return result;
         }
 
-        public void Play(List<Snapshot> solutions, int usedZ, int usedY, int usedX)
+        private void play(List<Snapshot> solutions, int usedZ, int usedY, int usedX, Piece usedPiece)
         {
-            foreach ((Piece piece, int z, int y, int x) in getMoves(usedZ, usedY, usedX).ToArray())
+            foreach ((Piece piece, int z, int y, int x) in getMoves(usedZ, usedY, usedX, usedPiece).ToArray())
             {
                 repository.Rent(piece);
                 add(piece, z, y, x);
                 if (Volume == 0)
                     solutions.Add(takeSnapshot());
                 else
-                    Play(solutions, z, y, x);
+                    play(solutions, z, y, x, piece);
                 remove(piece, z, y, x);
                 repository.Return(piece);
             }
@@ -95,7 +116,8 @@ namespace Ubongo3dMax
         public IEnumerable<Snapshot> Play()
         {
             var solutions = new List<Snapshot>();
-            Play(solutions, -1, -1, -1);
+            // do NOT use -1, because such small values can be offseted by piece size and can turn out to be legal
+            play(solutions, int.MinValue, int.MinValue, int.MinValue, null);
             return solutions.Distinct();
         }
 
@@ -111,17 +133,18 @@ namespace Ubongo3dMax
 
         private Snapshot takeSnapshot()
         {
-            return new Snapshot((Piece[,,])this.configuration.Clone(),repository.Usage);
+            return new Snapshot((Piece[,,])this.configuration.Clone(), repository.Usage);
         }
 
-        private void set(Piece piece, int z, int y, int x, bool value)
+        private void set(Piece piece, int z, int y, int x, bool freeingSpace)
         {
             foreach ((int pz, int py, int px) in piece.Positions)
             {
-                this[z + pz, y + py, x + px] = value;
-                this.configuration[z + pz, y + py, x + px] = value ? null : piece;
+                this[z + pz, y + py, x + px] = freeingSpace;
+                this.configuration[z + pz, y + py, x + px] = freeingSpace ? null : piece;
             }
-            if (value)
+
+            if (freeingSpace)
                 Volume += piece.Volume;
             else
                 Volume -= piece.Volume;

@@ -8,16 +8,16 @@ namespace Ubongo3dMax
     {
         internal IEnumerable<Piece> Pieces { get; }
         public IEnumerable<string> Usage => this.counter
-            .SelectMany(it => Enumerable.Range(0, piecePerGame - it.Value).Select(_ => it.Key));
+            .SelectMany(it => Enumerable.Range(0, piecesPerGame - it.Value).Select(_ => it.Key));
 
         internal readonly Dictionary<string, int> counter;
-        private readonly int piecePerGame;
+        private readonly int piecesPerGame;
 
-        public Repository(int piecePerGame, params Piece[] pieces)
+        public Repository(int piecesPerGame, IReadOnlyList<Piece> pieces)
         {
-            counter = pieces.ToDictionary(it => it.Label, _ => piecePerGame); 
+            counter = pieces.ToDictionary(it => it.Label, _ => piecesPerGame); 
             this.Pieces = pieces.SelectMany(it => it.Rotations()).ToArray();
-            this.piecePerGame = piecePerGame;
+            this.piecesPerGame = piecesPerGame;
         }
 
         internal bool IsAvailable(Piece piece)
