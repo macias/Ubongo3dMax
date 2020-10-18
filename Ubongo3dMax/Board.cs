@@ -73,7 +73,7 @@ namespace Ubongo3dMax
 
                 foreach (Piece p in pieces)
                     if (p.Volume <= this.Volume
-                        // piece index is just the forth coordinate
+                        // piece index is just the fourth coordinate
                         && (pos_comparison > 0 || p.Index > (usedPiece?.Index ?? -1))
                         && repository.IsAvailable(p)
                         // we have to check if we can fit at this particular time, because some space might be
