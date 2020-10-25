@@ -7,17 +7,123 @@ namespace Ubongo3dMax
 {
     internal sealed class Snapshot
     {
+        private sealed class SameLabels : IEqualityComparer<Snapshot>
+        {
+            public bool Equals(Snapshot x, Snapshot y)
+            {
+                if (Object.ReferenceEquals(x, y))
+                    return true;
+                if (Object.ReferenceEquals(x, null) || Object.ReferenceEquals(y, null))
+                    return false;
+
+                if (x.LengthZ != y.LengthZ || x.LengthY != y.LengthY || x.LengthX != y.LengthX)
+                    return false;
+
+                return x.HasSameLabels(y.labels);
+            }
+
+            public int GetHashCode(Snapshot obj)
+            {
+                return 0;
+            }
+        }
+
+        private sealed class LabelOrder : IComparer<Snapshot>
+        {
+            public int Compare(Snapshot x, Snapshot y)
+            {
+                return String.Join("", x.labels).CompareTo(String.Join("", y.labels));
+            }
+        }
+
+        public static IEqualityComparer<Snapshot> SameLabelsComparer { get; } = new SameLabels();
+        public static IComparer<Snapshot> LabelOrderComparer { get; } = new LabelOrder();
+
         private readonly Piece[,,] data;
+
+        public IReadOnlyList<Piece> Pieces { get; }
+
         private readonly IEnumerable<string> labels;
+
+        public bool IsSeparable { get; }
 
         public int LengthZ => this.data.GetLength(0);
         public int LengthY => this.data.GetLength(1);
         public int LengthX => this.data.GetLength(2);
 
-        public Snapshot(Piece[,,] data, IEnumerable<string> labels)
+        public Snapshot(Piece[,,] data)
         {
             this.data = data;
-            this.labels = labels.OrderBy(s => s).ToArray();
+            this.Pieces = data.Cast<Piece>()
+                .Distinct()
+                // we have empty spaces in the array
+                .Where(p => p != null)
+                .ToList();
+            this.labels = getLabels(Pieces).ToArray();
+
+            this.IsSeparable = zSeparable() || ySeparable() || xSeparable();
+        }
+
+        private static IOrderedEnumerable<string> getLabels(IEnumerable<Piece> pieces)
+        {
+            return pieces.Select(it => it.Label).OrderBy(s => s);
+        }
+
+        private bool zSeparable()
+        {
+            for (int z = 1; z < LengthZ; ++z)
+            {
+                for (int y = 0; y < LengthY; ++y)
+                    for (int x = 0; x < LengthX; ++x)
+                    {
+                        if (data[z - 1, y, x] == data[z, y, x])
+                            goto next_layer;
+                    }
+
+                return true;
+
+            next_layer: { }
+            }
+
+            return false;
+        }
+
+        private bool ySeparable()
+        {
+            for (int y = 1; y < LengthY; ++y)
+            {
+                for (int z = 0; z < LengthZ; ++z)
+                    for (int x = 0; x < LengthX; ++x)
+                    {
+                        if (data[z, y - 1, x] == data[z, y, x])
+                            goto next_layer;
+                    }
+
+                return true;
+
+            next_layer: { }
+            }
+
+            return false;
+        }
+
+        private bool xSeparable()
+        {
+            for (int x = 1; x < LengthX; ++x)
+            {
+                for (int z = 0; z < LengthZ; ++z)
+                    for (int y = 0; y < LengthY; ++y)
+                    {
+                        if (data[z, y, x - 1] == data[z, y, x])
+                            goto next_layer;
+                    }
+
+                return true;
+
+            next_layer: { }
+            }
+
+            return false;
         }
 
         public void Print(TextWriter writer, bool solution = false)
@@ -51,35 +157,17 @@ namespace Ubongo3dMax
             })));
         }
 
-        public override bool Equals(object obj)
+        public bool HasSameLabels(IEnumerable<string> other)
         {
-            return Equals(obj as Snapshot);
+            return this.labels.SequenceEqual(other);
         }
 
-        public override int GetHashCode()
+        internal IEnumerable<string> ExchangeLabels(Piece piece, Snapshot compounds)
         {
-            return 0;
+            return getLabels(this.Pieces.Where(it => it != piece).Concat(compounds.Pieces));
         }
 
-        public bool Equals(Snapshot other)
-        {
-            if (Object.ReferenceEquals(other, this))
-                return true;
-            if (Object.ReferenceEquals(other, null))
-                return false;
-
-            if (LengthZ != other.LengthZ || LengthY != other.LengthY || LengthX != other.LengthX)
-                return false;
-
-            // switch it if you want to see all ways how given board can be solved with the same pieces
-            const bool all_ways = false;
-            if (all_ways)
-                return isIdentical(other);
-            else
-                return samePieces(other);
-        }
-
-        private bool isIdentical(Snapshot other)
+        /*private bool isIdentical(Snapshot other)
         {
             for (int z = 0; z < LengthZ; ++z)
                 for (int y = 0; y < LengthY; ++y)
@@ -92,11 +180,6 @@ namespace Ubongo3dMax
                     }
 
             return true;
-        }
-
-        private bool samePieces(Snapshot other)
-        {
-            return this.labels.SequenceEqual(other.labels);
-        }
+        }*/
     }
 }

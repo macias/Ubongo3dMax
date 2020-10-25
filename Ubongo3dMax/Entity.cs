@@ -35,7 +35,7 @@ namespace Ubongo3dMax
             return data;
         }
 
-        protected readonly bool[,,] Data;
+        public readonly bool[,,] Data;
 
         protected int LengthZ => this.Data.GetLength(0);
         protected int LengthY => this.Data.GetLength(1);

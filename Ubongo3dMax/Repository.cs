@@ -7,17 +7,28 @@ namespace Ubongo3dMax
     internal sealed class Repository
     {
         internal IEnumerable<Piece> Pieces { get; }
-        public IEnumerable<string> Usage => this.counter
-            .SelectMany(it => Enumerable.Range(0, piecesPerGame - it.Value).Select(_ => it.Key));
 
         internal readonly Dictionary<string, int> counter;
         private readonly int piecesPerGame;
 
-        public Repository(int piecesPerGame, IReadOnlyList<Piece> pieces)
+        private Repository(int piecesPerGame, IEnumerable<Piece> pieces, object _)
         {
-            counter = pieces.ToDictionary(it => it.Label, _ => piecesPerGame); 
-            this.Pieces = pieces.SelectMany(it => it.Rotations()).ToArray();
             this.piecesPerGame = piecesPerGame;
+            this.Pieces = pieces.ToArray();
+            this.counter = this.Pieces.Select(it => it.Label).Distinct().ToDictionary(s => s, s => piecesPerGame);
+        }
+
+        // we check if given piece can be divided into two parts (smaller pieces)
+        public Repository(Repository source, string excludedLabel) : this(2,
+            source.Pieces.Where(it => it.Label != excludedLabel),
+            default)
+        {
+        }
+
+        public Repository(int piecesPerGame, IEnumerable<Piece> pieces) : this(piecesPerGame,
+            pieces.SelectMany(it => it.Rotations()),
+            default)
+        {
         }
 
         internal bool IsAvailable(Piece piece)
@@ -25,9 +36,10 @@ namespace Ubongo3dMax
             return counter[piece.Label] > 0;
         }
 
-        internal void Rent(Piece piece)
+        internal Piece Rent(Piece piece)
         {
             --counter[piece.Label];
+            return piece.Clone();
         }
 
         internal void Return(Piece piece)

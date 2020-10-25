@@ -17,7 +17,7 @@ namespace Ubongo3dMax
         private readonly Piece[,,] configuration;
         private readonly Repository repository;
 
-        private Board(Repository repository, bool[,,] data) : base(data)
+        public Board(Repository repository, bool[,,] data) : base(data)
         {
             this.Volume = data.Cast<bool>().Count(x => x);
             this.repository = repository;
@@ -98,28 +98,63 @@ namespace Ubongo3dMax
             return result;
         }
 
-        private void play(List<Snapshot> solutions, int usedZ, int usedY, int usedX, Piece usedPiece)
+        private List<Snapshot> solve(List<Snapshot> solutions, int usedZ, int usedY, int usedX, Piece usedPiece)
         {
-            foreach ((Piece piece, int z, int y, int x) in getMoves(usedZ, usedY, usedX, usedPiece).ToArray())
+            foreach ((Piece template, int z, int y, int x) in getMoves(usedZ, usedY, usedX, usedPiece).ToArray())
             {
-                repository.Rent(piece);
+                Piece piece = repository.Rent(template);
                 add(piece, z, y, x);
                 if (Volume == 0)
                     solutions.Add(takeSnapshot());
                 else
-                    play(solutions, z, y, x, piece);
+                    solve(solutions, z, y, x, piece);
                 remove(piece, z, y, x);
                 repository.Return(piece);
             }
+
+            return solutions;
         }
 
-        public IEnumerable<Snapshot> Play()
+        public IEnumerable<Snapshot> Solve(bool allowSeparable)
         {
-            var solutions = new List<Snapshot>();
             // do NOT use -1, because such small values can be offseted by piece size and can turn out to be legal
-            play(solutions, int.MinValue, int.MinValue, int.MinValue, null);
-            return solutions.Distinct();
+            var solutions = solve(new List<Snapshot>(), int.MinValue, int.MinValue, int.MinValue, null)
+                .GroupBy(sln => sln, Snapshot.SameLabelsComparer)
+                // if the given solution consists in fact of two smaller ones there is nothing wrong with it
+                // buch such setups are less interesting
+                .Where(grp => allowSeparable || grp.All(sln => !sln.IsSeparable))
+                .Select(grp => (sln: grp.Key, nonAtomic: true))
+                .ToList();
+
+            // and one more step to eliminate boring solutions -- let's say you have one solution which involves
+            // piece L (blue one) and another pretty same, but instead of "L" it contains two small reds (-)
+            // here we break down pieces to their atomic equivalences and if we found such solutions we
+            // remove the ones constructed with more atomic pieces (please note we don't rely on simply
+            // counting, because small reds can be used in "legimate" scenarios, when they are for example separated) 
+
+            // hint: A can invalidates B, and solution B can invalidates C, so don't remove B too quickly
+            foreach (Snapshot current_solution in solutions.Select(it => it.sln).ToArray())
+            {
+                foreach (Piece piece in current_solution.Pieces.Where(p => p.Compounds.Any()))
+                {
+                    foreach (Snapshot compounds in piece.Compounds)
+                    {
+                        IEnumerable<string> alt_labels = current_solution.ExchangeLabels(piece, compounds).ToArray();
+                        for (int i = 0; i < solutions.Count; ++i)
+                        {
+                            if (solutions[i].sln.HasSameLabels(alt_labels))
+                                solutions[i] = (solutions[i].sln, false);
+                        }
+                    }
+                }
+            }
+
+            return solutions
+                .Where(it => it.nonAtomic)
+                .Select(it => it.sln)
+                .OrderBy(it => it, Snapshot.LabelOrderComparer);
         }
+
 
         private void add(Piece piece, int z, int y, int x)
         {
@@ -133,7 +168,7 @@ namespace Ubongo3dMax
 
         private Snapshot takeSnapshot()
         {
-            return new Snapshot((Piece[,,])this.configuration.Clone(), repository.Usage);
+            return new Snapshot((Piece[,,])this.configuration.Clone());
         }
 
         private void set(Piece piece, int z, int y, int x, bool freeingSpace)

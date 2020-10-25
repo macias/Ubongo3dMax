@@ -6,10 +6,31 @@ namespace Ubongo3dMax
 {
     internal sealed class Piece : Entity
     {
+        private sealed class PieceOrientationComparer : IEqualityComparer<Piece>
+        {
+            public bool Equals(Piece x, Piece y)
+            {
+                if (Object.ReferenceEquals(x, y))
+                    return true;
+                if (Object.ReferenceEquals(x, null) || Object.ReferenceEquals(y, null))
+                    return false;
+
+                return Enumerable.SequenceEqual(x.Positions, y.Positions);
+            }
+
+            public int GetHashCode(Piece obj)
+            {
+                return 0;
+            }
+        }
+
+        private static readonly IEqualityComparer<Piece> orientationComparer = new PieceOrientationComparer();
+
         private readonly byte id;
         private readonly byte rotZ;
         private readonly byte rotY;
         private readonly byte rotX;
+        public IEnumerable<Snapshot> Compounds { get; private set; } // for example "L" consists of two "-" (small red) pieces
 
         public IEnumerable<(int z, int y, int x)> Positions
         {
@@ -38,13 +59,19 @@ namespace Ubongo3dMax
 
         private Piece(string label, byte id, byte rotZ, byte rotY, byte rotX, bool[,,] data) : base(data)
         {
+            this.Label = label ?? throw new ArgumentNullException(nameof(label));
             this.Volume = data.Cast<bool>().Count(x => x);
-            this.Label = label;
             this.id = id;
             this.rotZ = (byte)(rotZ % 4);
             this.rotY = (byte)(rotY % 4);
             this.rotX = (byte)(rotX % 4);
             this.Index = ((int)id) << 8 | ((int)rotZ) << 4 | ((int)rotY) << 2 | ((int)rotX);
+            this.Compounds = new Snapshot[] { };
+        }
+
+        internal Piece Clone()
+        {  // we reuse the same data, basically we need to create new reference of this type
+            return new Piece(Label, id, rotZ, rotY, rotX, Data) { Compounds = this.Compounds };
         }
 
         public IEnumerable<Piece> Rotations()
@@ -63,7 +90,7 @@ namespace Ubongo3dMax
             return rotations(this, true, false, false)
                 .SelectMany(p => rotations(p, false, true, false))
                 .SelectMany(p => rotations(p, false, false, true))
-                .Distinct();
+                .Distinct(Piece.orientationComparer);
         }
 
         // z-axis goes through the surface of the monitor
@@ -95,24 +122,9 @@ namespace Ubongo3dMax
             }
         }
 
-        public override bool Equals(object obj)
+        internal void SetCompounds(IEnumerable<Snapshot> compounds)
         {
-            return Equals(obj as Piece);
-        }
-
-        public bool Equals(Piece other)
-        {
-            if (Object.ReferenceEquals(other, this))
-                return true;
-            if (Object.ReferenceEquals(other, null))
-                return false;
-
-            return Enumerable.SequenceEqual(this.Positions, other.Positions);
-        }
-
-        public override int GetHashCode()
-        {
-            return 0;
+            this.Compounds = compounds.ToArray();
         }
 
         public override string ToString()

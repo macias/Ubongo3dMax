@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 
 namespace Ubongo3dMax
@@ -12,17 +13,28 @@ namespace Ubongo3dMax
 
         static void Main(string[] args)
         {
-            var layouts1 = getLayouts1();
-            var layouts2 = getLayouts2();
-            var layouts3 = getLayouts3();
-            var layouts4 = getLayouts4();
-
             var repository = new Repository(PIECES_PER_GAME, buildPieces()
                 .ToArray());
-            var board = Board.Parse(repository, BOARD_HEIGHT, layouts1[0]);
+
+            // computing if we can split given piece into another two smaller ones
+            foreach (Piece piece in repository.Pieces)
+            {
+                var piece_board = new Board(new Repository(repository, piece.Label), (bool[,,])piece.Data.Clone());
+                piece.SetCompounds(piece_board.Solve(allowSeparable: true));
+            }
+
+            Console.WriteLine("Enter deck-card number (deck: 1-4, card: 1-36):");
+            string line = Console.ReadLine();
+            int[] parts = line.Split('-').Select(s => int.Parse(s, CultureInfo.InvariantCulture)).ToArray();
+            int deck = parts[0] - 1;
+            int card = parts[1] - 1;
+
+
+            var board = Board.Parse(repository, BOARD_HEIGHT, getAllDecks().ElementAt(deck).ElementAt(card));
 
             long start = Stopwatch.GetTimestamp();
-            IEnumerable<Snapshot> solutions = board.Play().ToArray();
+            IEnumerable<Snapshot> solutions = board.Solve(allowSeparable: false).ToArray();
+            TimeSpan passed = TimeSpan.FromSeconds((Stopwatch.GetTimestamp() - start - 0.0) / Stopwatch.Frequency);
             System.IO.TextWriter writer = Console.Out;
             int c = 0;
             int count = solutions.Count();
@@ -34,7 +46,7 @@ namespace Ubongo3dMax
             }
 
             Console.WriteLine();
-            Console.WriteLine($"Found {count} in {TimeSpan.FromSeconds((Stopwatch.GetTimestamp() - start - 0.0) / Stopwatch.Frequency)}");
+            Console.WriteLine($"Found {count} in {passed}");
         }
 
         private static IEnumerable<Piece> buildPieces()
@@ -88,7 +100,7 @@ namespace Ubongo3dMax
             });
         }
 
-        private static string[][] getLayouts3()
+        private static string[][] getDeck3()
         {
             return new[] {
                 new[]
@@ -332,7 +344,7 @@ namespace Ubongo3dMax
             };
         }
 
-        private static string[][] getLayouts4()
+        private static string[][] getGeck4()
         {
             return new[] {
                 new[]
@@ -568,7 +580,7 @@ namespace Ubongo3dMax
             };
         }
 
-        private static string[][] getLayouts2()
+        private static string[][] getDeck2()
         {
             return new[] {
                 new[]
@@ -799,7 +811,15 @@ namespace Ubongo3dMax
             };
         }
 
-        private static string[][] getLayouts1()
+        private static IEnumerable<string[][]> getAllDecks()
+        {
+            yield return getDeck1();
+            yield return getDeck2();
+            yield return getDeck3();
+            yield return getGeck4();
+        }
+
+        private static string[][] getDeck1()
         {
             return new[] {
                 new[]
