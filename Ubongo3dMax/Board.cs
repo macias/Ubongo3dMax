@@ -121,7 +121,7 @@ namespace Ubongo3dMax
             var solutions = solve(new List<Snapshot>(), int.MinValue, int.MinValue, int.MinValue, null)
                 .GroupBy(sln => sln, Snapshot.SameLabelsComparer)
                 // if the given solution consists in fact of two smaller ones there is nothing wrong with it
-                // buch such setups are less interesting
+                // but such setups are less interesting
                 .Where(grp => allowSeparable || grp.All(sln => !sln.IsSeparable))
                 .Select(grp => (sln: grp.Key, nonAtomic: true))
                 .ToList();
@@ -132,10 +132,10 @@ namespace Ubongo3dMax
             // remove the ones constructed with more atomic pieces (please note we don't rely on simply
             // counting, because small reds can be used in "legimate" scenarios, when they are for example separated) 
 
-            // hint: A can invalidates B, and solution B can invalidates C, so don't remove B too quickly
+            // hint: A can invalidate B, and solution B can invalidate C, so don't remove B too quickly
             foreach (Snapshot current_solution in solutions.Select(it => it.sln).ToArray())
             {
-                foreach (Piece piece in current_solution.Pieces.Where(p => p.Compounds.Any()))
+                foreach (Piece piece in current_solution.Pieces)
                 {
                     foreach (Snapshot compounds in piece.Compounds)
                     {

@@ -9,17 +9,17 @@ namespace Ubongo3dMax
     {
         private sealed class SameLabels : IEqualityComparer<Snapshot>
         {
-            public bool Equals(Snapshot x, Snapshot y)
+            public bool Equals(Snapshot a, Snapshot b)
             {
-                if (Object.ReferenceEquals(x, y))
+                if (Object.ReferenceEquals(a, b))
                     return true;
-                if (Object.ReferenceEquals(x, null) || Object.ReferenceEquals(y, null))
+                if (Object.ReferenceEquals(a, null) || Object.ReferenceEquals(b, null))
                     return false;
 
-                if (x.LengthZ != y.LengthZ || x.LengthY != y.LengthY || x.LengthX != y.LengthX)
+                if (a.LengthZ != b.LengthZ || a.LengthY != b.LengthY || a.LengthX != b.LengthX)
                     return false;
 
-                return x.HasSameLabels(y.labels);
+                return a.HasSameLabels(b.labels);
             }
 
             public int GetHashCode(Snapshot obj)
@@ -76,7 +76,7 @@ namespace Ubongo3dMax
                 for (int y = 0; y < LengthY; ++y)
                     for (int x = 0; x < LengthX; ++x)
                     {
-                        if (data[z - 1, y, x] == data[z, y, x])
+                        if (data[z, y, x] != null && data[z - 1, y, x] == data[z, y, x])
                             goto next_layer;
                     }
 
@@ -95,7 +95,7 @@ namespace Ubongo3dMax
                 for (int z = 0; z < LengthZ; ++z)
                     for (int x = 0; x < LengthX; ++x)
                     {
-                        if (data[z, y - 1, x] == data[z, y, x])
+                        if (data[z, y, x] != null && data[z, y - 1, x] == data[z, y, x])
                             goto next_layer;
                     }
 
@@ -114,7 +114,7 @@ namespace Ubongo3dMax
                 for (int z = 0; z < LengthZ; ++z)
                     for (int y = 0; y < LengthY; ++y)
                     {
-                        if (data[z, y, x - 1] == data[z, y, x])
+                        if (data[z, y, x] != null && data[z, y, x - 1] == data[z, y, x])
                             goto next_layer;
                     }
 
@@ -130,6 +130,11 @@ namespace Ubongo3dMax
         {
             if (solution)
             {
+                var ids = new Dictionary<Piece, int>();
+                foreach (var p in this.Pieces)
+                    ids.Add(p, ids.Count);
+                int id_len = (this.Pieces.Count-1).ToString().Length;
+                string empty_cell = new string(' ', 2 + 1 + id_len + 1);
                 for (int y = 0; y < LengthY; ++y)
                 {
                     for (int z = 0; z < LengthZ; ++z)
@@ -138,9 +143,9 @@ namespace Ubongo3dMax
                         {
                             Piece piece = data[z, y, x];
                             if (piece != null)
-                                writer.Write($"{piece.Label} ");
+                                writer.Write($"{piece.Label}/{ids[piece].ToString().PadRight(id_len)} ");
                             else
-                                writer.Write($"   ");
+                                writer.Write(empty_cell);
                         }
                         writer.WriteLine();
                     }

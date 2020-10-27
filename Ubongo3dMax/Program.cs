@@ -1,20 +1,27 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Globalization;
+using System.IO;
 using System.Linq;
 
 namespace Ubongo3dMax
 {
     class Program
     {
-        private const int PIECES_PER_GAME = 2;
-        private const int BOARD_HEIGHT = 3;
-
         static void Main(string[] args)
         {
-            var repository = new Repository(PIECES_PER_GAME, buildPieces()
-                .ToArray());
+            Console.WriteLine("Enter deck-card number (deck 1-4, card 1-36):");
+            string line = Console.ReadLine();
+            int[] parts = line.Split('-').Select(s => int.Parse(s)).ToArray();
+            int deck = parts[0] - 1;
+            int card = parts[1] - 1;
+
+            Console.WriteLine("Enter height (stock value 2):");
+            int board_height = int.Parse(Console.ReadLine());
+            Console.WriteLine("Same pieces per game (stock value 1):");
+            int pieces_per_game = int.Parse(Console.ReadLine());
+
+            var repository = new Repository(pieces_per_game, buildPieces().ToArray());
 
             // computing if we can split given piece into another two smaller ones
             foreach (Piece piece in repository.Pieces)
@@ -23,19 +30,16 @@ namespace Ubongo3dMax
                 piece.SetCompounds(piece_board.Solve(allowSeparable: true));
             }
 
-            Console.WriteLine("Enter deck-card number (deck: 1-4, card: 1-36):");
-            string line = Console.ReadLine();
-            int[] parts = line.Split('-').Select(s => int.Parse(s, CultureInfo.InvariantCulture)).ToArray();
-            int deck = parts[0] - 1;
-            int card = parts[1] - 1;
-
-
-            var board = Board.Parse(repository, BOARD_HEIGHT, getAllDecks().ElementAt(deck).ElementAt(card));
+            var board = Board.Parse(repository, board_height, getAllDecks().ElementAt(deck).ElementAt(card));
 
             long start = Stopwatch.GetTimestamp();
             IEnumerable<Snapshot> solutions = board.Solve(allowSeparable: false).ToArray();
             TimeSpan passed = TimeSpan.FromSeconds((Stopwatch.GetTimestamp() - start - 0.0) / Stopwatch.Frequency);
-            System.IO.TextWriter writer = Console.Out;
+            System.IO.TextWriter writer;
+            if (args.Any())
+                writer = new StreamWriter(args[0]); // yes, I know, Dispose is missing
+            else
+                writer = Console.Out;
             int c = 0;
             int count = solutions.Count();
             foreach (Snapshot snap in solutions)
@@ -44,6 +48,8 @@ namespace Ubongo3dMax
                 writer.Write(c.ToString().PadLeft(count.ToString().Length) + ". ");
                 snap.Print(writer);
             }
+
+            writer.Flush();
 
             Console.WriteLine();
             Console.WriteLine($"Found {count} in {passed}");

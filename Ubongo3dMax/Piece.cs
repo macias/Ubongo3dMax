@@ -26,7 +26,7 @@ namespace Ubongo3dMax
 
         private static readonly IEqualityComparer<Piece> orientationComparer = new PieceOrientationComparer();
 
-        private readonly byte id;
+        private readonly byte kind;
         private readonly byte rotZ;
         private readonly byte rotY;
         private readonly byte rotX;
@@ -52,26 +52,26 @@ namespace Ubongo3dMax
 
         public int Volume { get; }
 
-        public static Piece Parse(string label, byte id, byte rotZ, byte rotY, byte rotX, params IEnumerable<string>[] layers)
+        public static Piece Parse(string label, byte kind, byte rotZ, byte rotY, byte rotX, params IEnumerable<string>[] layers)
         {
-            return new Piece(label, id, rotZ, rotY, rotX, Parse(layers));
+            return new Piece(label, kind, rotZ, rotY, rotX, Parse(layers));
         }
 
-        private Piece(string label, byte id, byte rotZ, byte rotY, byte rotX, bool[,,] data) : base(data)
+        private Piece(string label, byte kind, byte rotZ, byte rotY, byte rotX, bool[,,] data) : base(data)
         {
             this.Label = label ?? throw new ArgumentNullException(nameof(label));
             this.Volume = data.Cast<bool>().Count(x => x);
-            this.id = id;
+            this.kind = kind;
             this.rotZ = (byte)(rotZ % 4);
             this.rotY = (byte)(rotY % 4);
             this.rotX = (byte)(rotX % 4);
-            this.Index = ((int)id) << 8 | ((int)rotZ) << 4 | ((int)rotY) << 2 | ((int)rotX);
+            this.Index = ((int)kind) << 8 | ((int)rotZ) << 4 | ((int)rotY) << 2 | ((int)rotX);
             this.Compounds = new Snapshot[] { };
         }
 
         internal Piece Clone()
         {  // we reuse the same data, basically we need to create new reference of this type
-            return new Piece(Label, id, rotZ, rotY, rotX, Data) { Compounds = this.Compounds };
+            return new Piece(Label, kind, rotZ, rotY, rotX, Data) { Compounds = this.Compounds };
         }
 
         public IEnumerable<Piece> Rotations()
@@ -85,8 +85,6 @@ namespace Ubongo3dMax
                 }
             }
 
-            // I bet this is buggy (i.e. not optimized) for sure, because Equals does not check if the piece 
-            // was shifted because of rotation. As the result we (can) get some duplicates
             return rotations(this, true, false, false)
                 .SelectMany(p => rotations(p, false, true, false))
                 .SelectMany(p => rotations(p, false, false, true))
@@ -104,21 +102,21 @@ namespace Ubongo3dMax
                 var output = new bool[LengthZ, LengthX, LengthY];
                 foreach ((int z, int y, int x) in Positions)
                     output[z, LengthX - 1 - x, y] = Data[z, y, x];
-                return new Piece(Label, this.id, (byte)(rotZ + 1), rotY, rotX, output);
+                return new Piece(Label, this.kind, (byte)(rotZ + 1), rotY, rotX, output);
             }
             else if (yAxis)
             {
                 var output = new bool[LengthX, LengthY, LengthZ];
                 foreach ((int z, int y, int x) in Positions)
                     output[x, y, LengthZ - 1 - z] = Data[z, y, x];
-                return new Piece(Label, id, rotZ, (byte)(rotY + 1), rotX, output);
+                return new Piece(Label, kind, rotZ, (byte)(rotY + 1), rotX, output);
             }
             else
             {
                 var output = new bool[LengthY, LengthZ, LengthX];
                 foreach ((int z, int y, int x) in Positions)
                     output[LengthY - 1 - y, z, x] = Data[z, y, x];
-                return new Piece(Label, id, rotZ, rotY, (byte)(rotX + 1), output);
+                return new Piece(Label, kind, rotZ, rotY, (byte)(rotX + 1), output);
             }
         }
 
