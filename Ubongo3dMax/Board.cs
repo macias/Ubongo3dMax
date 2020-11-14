@@ -123,7 +123,7 @@ namespace Ubongo3dMax
                 // if the given solution consists in fact of two smaller ones there is nothing wrong with it
                 // but such setups are less interesting
                 .Where(grp => allowSeparable || grp.All(sln => !sln.IsSeparable))
-                .Select(grp => (sln: grp.Key, nonAtomic: true))
+                .Select(grp => { grp.Key.Permutations = grp.Count(); return (sln: grp.Key, nonAtomic: true); })
                 .ToList();
 
             // and one more step to eliminate boring solutions -- let's say you have one solution which involves

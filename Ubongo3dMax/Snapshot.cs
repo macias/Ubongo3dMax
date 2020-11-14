@@ -46,6 +46,7 @@ namespace Ubongo3dMax
         private readonly IEnumerable<string> labels;
 
         public bool IsSeparable { get; }
+        public int Permutations { get; set; } // how many other permutations with the same pieces exist
 
         public int LengthZ => this.data.GetLength(0);
         public int LengthY => this.data.GetLength(1);
@@ -133,7 +134,7 @@ namespace Ubongo3dMax
                 var ids = new Dictionary<Piece, int>();
                 foreach (var p in this.Pieces)
                     ids.Add(p, ids.Count);
-                int id_len = (this.Pieces.Count-1).ToString().Length;
+                int id_len = (this.Pieces.Count - 1).ToString().Length;
                 string empty_cell = new string(' ', 2 + 1 + id_len + 1);
                 for (int y = 0; y < LengthY; ++y)
                 {
@@ -159,7 +160,7 @@ namespace Ubongo3dMax
             {
                 int c = it.Count();
                 return (c == 1 ? "" : $"{c} ") + it.Key;
-            })));
+            })) + $" #{Permutations}");
         }
 
         public bool HasSameLabels(IEnumerable<string> other)
